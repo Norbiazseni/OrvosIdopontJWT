@@ -4,46 +4,61 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use App\Models\Doctor;
 
 class DoctorController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    // 🔵 ÖSSZES DOKTOR
     public function index()
     {
-        //
+        return Doctor::all();
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
+    // 🔵 EGY DOKTOR
+    public function show($id)
+    {
+        return Doctor::findOrFail($id);
+    }
+
+    // 🟢 ÚJ DOKTOR
     public function store(Request $request)
     {
-        //
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'specialization' => 'required|string|max:255',
+            'room' => 'required|string|max:50',
+        ]);
+
+        $doctor = Doctor::create($data);
+
+        return response()->json($doctor, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    // ✏️ MÓDOSÍTÁS
+    public function update(Request $request, $id)
     {
-        //
+        $doctor = Doctor::findOrFail($id);
+
+        $data = $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'specialization' => 'sometimes|string|max:255',
+            'room' => 'sometimes|string|max:50',
+        ]);
+
+        $doctor->update($data);
+
+        return response()->json($doctor);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
+    // 🗑 TÖRLÉS
+    public function destroy($id)
     {
-        //
-    }
+        $doctor = Doctor::findOrFail($id);
+        $doctor->delete();
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return response()->json([
+            'message' => 'Doctor deleted successfully'
+        ]);
     }
 }
+?>

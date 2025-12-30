@@ -39,5 +39,8 @@ Route::middleware('auth:api')->group(function () {
     Route::patch('/appointments/{appointment}', [AppointmentController::class, 'update']);
     Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy']);
 
+    Route::middleware('auth:api')->post('/logout', [AuthController::class, 'logout']);
+
+
 });
 

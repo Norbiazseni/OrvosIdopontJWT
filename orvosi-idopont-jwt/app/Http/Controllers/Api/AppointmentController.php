@@ -54,7 +54,7 @@ class AppointmentController extends Controller
     }
 
     // 🔴 ADMIN – státusz módosítás
-    public function updateStatus(Request $request, $id)
+    public function update(Request $request, $id)
     {
         $this->adminOnly();
 

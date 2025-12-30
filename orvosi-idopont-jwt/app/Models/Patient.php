@@ -13,7 +13,7 @@ class Patient extends Model
     protected $fillable = [
         'name',
         'email',
-        'phone',
+        'birth_date'
     ];
 
     public function appointments()

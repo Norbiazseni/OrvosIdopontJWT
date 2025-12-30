@@ -13,7 +13,7 @@ class Doctor extends Model
     protected $fillable = [
         'name',
         'specialization',
-        'email',
+        'room',
     ];
 
     public function appointments()
