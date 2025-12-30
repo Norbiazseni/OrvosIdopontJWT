@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -11,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class User extends Authenticatable implements JWTSubject
 {
-    use SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -22,10 +21,10 @@ class User extends Authenticatable implements JWTSubject
 
     protected $hidden = [
         'password',
-        'remember_token',
+        'remember_token'
     ];
 
-        public function getJWTIdentifier()
+    public function getJWTIdentifier()
     {
         return $this->getKey();
     }
@@ -37,4 +36,16 @@ class User extends Authenticatable implements JWTSubject
         ];
     }
 
+    // OPTIONAL kapcsolatok
+    public function doctor()
+    {
+        return $this->hasOne(Doctor::class);
+    }
+
+    public function patient()
+    {
+        return $this->hasOne(Patient::class);
+    }
 }
+
+?>
