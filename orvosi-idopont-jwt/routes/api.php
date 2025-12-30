@@ -34,9 +34,10 @@ Route::middleware('auth:api')->group(function () {
     Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
 
     // 📅 APPOINTMENTS
-    Route::get('/appointments', [AppointmentController::class, 'index']);              // admin
-    Route::get('/appointments/my', [AppointmentController::class, 'myAppointments']); // user
+    Route::get('/appointments', [AppointmentController::class, 'index']);
     Route::post('/appointments', [AppointmentController::class, 'store']);
-    Route::put('/appointments/{id}/status', [AppointmentController::class, 'updateStatus']); // admin
-    Route::delete('/appointments/{id}', [AppointmentController::class, 'destroy']);
+    Route::patch('/appointments/{appointment}', [AppointmentController::class, 'update']);
+    Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy']);
+
 });
+

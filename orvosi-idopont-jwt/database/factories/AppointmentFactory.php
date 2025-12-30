@@ -14,12 +14,11 @@ class AppointmentFactory extends Factory
     public function definition()
     {
         return [
-            'patient_id' => Patient::factory(), // új patient készül, vagy adhatsz létezőt
+            'patient_id' => Patient::factory(),
             'doctor_id' => Doctor::factory(),
             'appointment_time' => $this->faker->dateTimeBetween('+1 days', '+1 month'),
             'status' => $this->faker->randomElement(['pending', 'approved', 'cancelled']),
         ];
     }
 }
-
 ?>

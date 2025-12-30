@@ -6,18 +6,24 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Appointment;
 use Illuminate\Support\Facades\Auth;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AppointmentController extends Controller
 {
     // 🔴 ADMIN – összes időpont
     public function index()
     {
-        $this->adminOnly();
+        $user = JWTAuth::user();
 
-        return response()->json(
-            Appointment::with(['patient', 'doctor'])->get()
-        );
+        if ($user->role === 'admin') {
+            // admin mindent lát
+            return Appointment::all();
+        }
+
+        // normál user csak a sajátját
+        return Appointment::where('patient_id', $user->id)->get();
     }
+
 
     // 🟢 USER – saját időpontok
     public function myAppointments()
