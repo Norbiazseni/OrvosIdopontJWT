@@ -1233,25 +1233,349 @@ class DatabaseSeeder extends Seeder
 
 -AppointmentTest.php
 
-1. admin_can_create_appointment() - Egy admin felhasználó sikeresen létre tud-e hozni egy új időpontot.
-2. normal_user_cannot_create_appointment() - Egy sima (nem admin) felhasználó nem hozhat létre időpontot.
-3. can_get_appointments_list() - Egy admin le tudja-e kérni az összes időpontot az API-n keresztül.
-4. admin_can_update_appointment() - Az admin módosíthatja egy létező időpont adatait.
-5. admin_can_delete_appointment() - Az admin jogosult-e időpontot törölni.
+Az AppointmentTest az időpontok lekérdezéséhez kapcsolódó jogosultságokat és viselkedést teszteli az API-n keresztül JWT-alapú autentikációval.
+
+Tesztelt esetek:
+
+1. admin_can_see_all_appointments()
+-Ellenőrzi, hogy egy admin felhasználó sikeresen le tudja-e kérni az összes időpontot az /api/appointments végpontról.
+-A teszt során 3 időpont kerül létrehozásra, majd az admin lekérdezése után a válasz pontosan 3 rekordot tartalmaz.
+
+2. user_sees_only_own_appointments()
+-Ellenőrzi, hogy egy normál felhasználó kizárólag a saját páciens rekordjához tartozó időpontokat látja.
+-A teszt létrehoz egy felhasználóhoz tartozó pácienst és egy ahhoz kapcsolódó időpontot, valamint egy másik (idegen) időpontot.
+-Az API válasza ebben az esetben csak 1 időpontot tartalmaz, így igazolva a jogosultsági szűrést.
+
+```php
+
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\User;
+use App\Models\Doctor;
+use App\Models\Patient;
+use App\Models\Appointment;
+
+class AppointmentTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function authHeader(User $user)
+    {
+        $token = auth('api')->login($user);
+        return ['Authorization' => "Bearer $token"];
+    }
+
+    /** @test */
+    public function admin_can_see_all_appointments()
+    {
+        $admin = User::factory()->admin()->create();
+        Appointment::factory()->count(3)->create();
+
+        $response = $this->getJson(
+            '/api/appointments',
+            $this->authHeader($admin)
+        );
+
+        $response->assertStatus(200)
+                 ->assertJsonCount(3);
+    }
+
+    /** @test */
+    public function user_sees_only_own_appointments()
+    {
+        $user = User::factory()->create();
+
+        $patient = Patient::factory()->create(['user_id' => $user->id]);
+        $doctor  = Doctor::factory()->create();
+
+        Appointment::factory()->create([
+            'patient_id' => $patient->id,
+            'doctor_id' => $doctor->id,
+        ]);
+
+        Appointment::factory()->create(); // másik páciens időpontja
+
+        $response = $this->getJson(
+            '/api/appointments',
+            $this->authHeader($user)
+        );
+
+        $response->assertStatus(200)
+                 ->assertJsonCount(1);
+    }
+}
+?>
+
+
+```
 
 -DoctorTest.php
 
-1. admin_can_create_doctor() - Egy admin felhasználó képes-e új orvost létrehozni az API-n keresztül.
-2. normal_user_cannot_create_doctor() - Egy normál (nem admin) felhasználó ne tudjon új orvost létrehozni.
-3. can_get_doctors_list() - Egy admin le tudja-e kérni az összes orvost az API-n keresztül.
+
+A DoctorTest az orvosok kezeléséhez kapcsolódó API végpontok működését és jogosultságkezelését teszteli JWT-alapú autentikáció mellett.
+
+Tesztelt esetek:
+
+1. admin_can_create_doctor()
+-Ellenőrzi, hogy egy admin jogosultságú felhasználó sikeresen létre tud-e hozni egy új orvost az /api/doctors végponton keresztül.
+-A teszt során az admin egy POST kérést küld az orvos adataival (név, szakterület, szoba), majd ellenőrzi, hogy sikeres-e, és az új orvos valóban bekerült-e az adatbázisba.
+
+```php
+<?php
+
+namespace Tests\Feature;
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithFaker;
+use Tests\TestCase;
+use App\Models\User;
+
+class DoctorTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function authHeader(User $user)
+    {
+        $token = auth('api')->login($user);
+        return ['Authorization' => "Bearer $token"];
+    }
+    
+    /** @test */
+    public function admin_can_create_doctor()
+    {
+        $admin = User::factory()->admin()->create();
+
+        $response = $this->postJson('/api/doctors', [
+            'name' => 'Dr Teszt',
+            'specialization' => 'Kardiológia',
+            'room' => '101'
+        ], $this->authHeader($admin));
+
+        $response->assertStatus(201);
+
+        $this->assertDatabaseHas('doctors', [
+            'name' => 'Dr Teszt'
+        ]);
+    }
+
+}
+
+```
+
+-AuthTest.php
+
+Az AuthTest az API autentikációs folyamatait teszteli, különös tekintettel a felhasználói regisztrációra és a bejelentkezésre JWT-alapú hitelesítés mellett.
+
+Tesztelt esetek:
+
+1. user_can_register()
+-Ellenőrzi, hogy egy új felhasználó sikeresen tud-e regisztrálni az /api/register végponton keresztül.
+-POST kérés kerül elküldésre érvényes regisztrációs adatokkal, a válasz HTTP státuszkódja 201 (Created), a válasz tartalmaz egy JWT tokent és a létrehozott felhasználó adatait, az új felhasználó valóban bekerül az adatbázisba.
+
+```php
+
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\User;
+
+class AuthTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /** @test */
+    public function user_can_register()
+    {
+        $response = $this->postJson('/api/register', [
+            'name' => 'Teszt User',
+            'email' => 'test@test.hu',
+            'password' => 'password',
+            'password_confirmation' => 'password'
+        ]);
+
+        $response->assertStatus(201)
+                 ->assertJsonStructure([
+                     'token',
+                     'user' => ['id', 'name', 'email', 'role']
+                 ]);
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'test@test.hu'
+        ]);
+    }
+
+    /** @test */
+    public function user_can_login()
+    {
+        User::factory()->create([
+            'email' => 'login@test.hu',
+            'password' => bcrypt('password')
+        ]);
+
+        $response = $this->postJson('/api/login', [
+            'email' => 'login@test.hu',
+            'password' => 'password'
+        ]);
+
+        $response->assertStatus(200)
+                 ->assertJsonStructure(['token', 'user']);
+    }
+}
+?>
+
+```
 
 -PatientTest.php
 
-1. admin_can_create_patient() - Egy admin felhasználó képes-e új pácienst létrehozni az API-n keresztül.
-2. normal_user_cannot_create_patient() - Egy normál (nem admin) felhasználó ne hozhasson létre új pácienst.
-3. can_get_patients_list() - Egy admin le tudja-e kérni az összes pácienst az API-ból.
+A PatientTest az API pácienskezelő végpontjainak működését és jogosultságkezelését ellenőrzi JWT-alapú autentikáció mellett. A tesztek biztosítják, hogy az admin és a normál felhasználók csak a számukra engedélyezett műveleteket hajthassák végre.
 
-11 (+1 próbateszt) tesztet tartalmaz, melyek közül mind sikerrel lefut.
+Tesztelt esetek:
+
+1. admin_can_create_patient()
+Ellenőrzi, hogy egy admin jogosultságú felhasználó sikeresen létre tud hozni új pácienst az API-n keresztül, és az adat megfelelően bekerül az adatbázisba.
+
+2. normal_user_can_create_own_patient()
+Vizsgálja, hogy egy normál felhasználó létrehozhatja a saját páciens rekordját, amely automatikusan az ő user_id-jához kerül hozzárendelésre.
+
+3. normal_user_cannot_create_patient_for_other_user()
+Biztosítja, hogy egy normál felhasználó ne tudjon más felhasználóhoz tartozó pácienst létrehozni: ha user_id mezőt ad meg, a controller azt felülírja a bejelentkezett felhasználó azonosítójával.
+
+4. admin_can_see_all_patients()
+Ellenőrzi, hogy az admin felhasználó az összes páciens rekordot le tudja kérni az API /patients végpontján keresztül.
+
+5. user_sees_only_own_patient()
+Vizsgálja, hogy egy normál felhasználó csak a saját páciens rekordját látja, más felhasználók adatai nem jelennek meg számára.
+
+```php
+
+<?php
+
+namespace Tests\Feature;
+
+use Tests\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\User;
+use App\Models\Patient;
+
+class PatientTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function authHeader(User $user)
+    {
+        $token = auth('api')->login($user);
+        return ['Authorization' => "Bearer $token"];
+    }
+
+    /** @test */
+    public function admin_can_create_patient()
+    {
+        $admin = User::factory()->admin()->create();
+
+        $response = $this->postJson('/api/patients', [
+            'name' => 'Teszt Páciens',
+            'birth_date' => '2000-01-01',
+            'phone' => '123456789',
+        ], $this->authHeader($admin));
+
+        $response->assertStatus(201);
+
+        $this->assertDatabaseHas('patients', [
+            'name' => 'Teszt Páciens',
+        ]);
+    }
+
+    /** @test */
+    public function normal_user_can_create_own_patient()
+    {
+        $user = User::factory()->create();
+
+        $response = $this->postJson('/api/patients', [
+            'name' => 'Saját Páciens',
+            'birth_date' => '1999-05-05',
+            'phone' => '987654321',
+        ], $this->authHeader($user));
+
+        $response->assertStatus(201);
+
+        $this->assertDatabaseHas('patients', [
+            'name' => 'Saját Páciens',
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /** @test */
+    public function normal_user_cannot_create_patient_for_other_user()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        $response = $this->postJson('/api/patients', [
+            'name' => 'Illegális Páciens',
+            'birth_date' => '1990-01-01',
+            'phone' => '111111111',
+            'user_id' => $otherUser->id,
+        ], $this->authHeader($user));
+
+        $response->assertStatus(201);
+
+        // user_id-t felülírja a controller -> saját lesz
+        $this->assertDatabaseHas('patients', [
+            'name' => 'Illegális Páciens',
+            'user_id' => $user->id,
+        ]);
+    }
+
+    /** @test */
+    public function admin_can_see_all_patients()
+    {
+        $admin = User::factory()->admin()->create();
+        Patient::factory()->count(3)->create();
+
+        $response = $this->getJson(
+            '/api/patients',
+            $this->authHeader($admin)
+        );
+
+        $response->assertStatus(200)
+                 ->assertJsonCount(3);
+    }
+
+    /** @test */
+    public function user_sees_only_own_patient()
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+
+        Patient::factory()->create(['user_id' => $user->id]);
+        Patient::factory()->create(['user_id' => $otherUser->id]);
+
+        $response = $this->getJson(
+            '/api/patients',
+            $this->authHeader($user)
+        );
+
+        $response->assertStatus(200)
+                 ->assertJsonCount(1);
+    }
+}
+
+
+
+```
+
+
+12 tesztet tartalmaz, melyek közül mind sikerrel lefut.
+
+<img width="486" height="184" alt="image" src="https://github.com/user-attachments/assets/f3a15f17-bbbe-4ba2-9596-171e6f89592b" />
+
 
 **Tesztek futtatása**: `php artisan test`
 
