@@ -42,6 +42,9 @@ class PatientController extends Controller
         // user nem adhat meg más user_id-t
         if ($user->role !== 'admin') {
             $data['user_id'] = $user->id;
+        } elseif (!isset($data['user_id'])) {
+            // admin: ha nincs user_id megadva, saját maga
+            $data['user_id'] = $user->id;
         }
 
         return response()->json(
