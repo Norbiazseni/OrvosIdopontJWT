@@ -18,6 +18,15 @@ Az OrvosIdopontJWT egy Laravel-alapú REST API alkalmazás, amely orvosi pácien
 
 ---
 
+Érdemes tudnivalók a JWT Tokenről:
+
+-60 percig érvényes (3600 mp)
+-A token tartalmaz minden adatot
+-Refresh mechanizmus: /api/refresh endpoint
+-Kijelentkezésnél a token érvénytelenné válik
+
+---
+
 ## Adatmodell
 
 ### User (Felhasználó)
