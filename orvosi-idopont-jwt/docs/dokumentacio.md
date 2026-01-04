@@ -1228,9 +1228,6 @@ class DatabaseSeeder extends Seeder
 
 ## Tesztelés
 
-<img width="647" height="132" alt="image" src="https://github.com/user-attachments/assets/28ab8f3b-61fd-4d49-ac75-87715e4e9cf8" />
-
-
 -AppointmentTest.php
 
 Az AppointmentTest az időpontok lekérdezéséhez kapcsolódó jogosultságokat és viselkedést teszteli az API-n keresztül JWT-alapú autentikációval.
