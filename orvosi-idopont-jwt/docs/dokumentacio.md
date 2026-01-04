@@ -1,14 +1,14 @@
-# OrvosIdopontBearer REST API — Dokumentáció
+# OrvosIdopontJWT REST API — Dokumentáció
 
-OrvosIdopontBearer — egy Laravel alapú REST API alkalmazás, amely orvosi páciensek, orvosok és időpontok kezelésére szolgál. 
+Az OrvosIdopontJWT egy Laravel-alapú REST API alkalmazás, amely orvosi páciensek, orvosok és időpontok kezelésére szolgál JWT (JSON Web Token) alapú autentikációval.
 
 ---
 
 ## Általános
 
-- Base URL: `http://localhost/orvosIdopontBearer/public/api`
-- Adatbázis neve: orvos_idopont_bearer
-- Auth: Bearer token (Laravel Sanctum). A token a `/login` végponttal szerezhető be.
+- Base URL: `http://127.0.0.1:8000/api`
+- Adatbázis neve: orvos_idopont_jwt
+- Auth: JWT Bearer token (tymon/jwt-auth). A token a `/login` végponttal szerezhető be.
 - Hibák:
   - 400 Bad Request — rossz kérés
   - 401 Unauthorized — hiányzó/érvénytelen token
@@ -24,10 +24,10 @@ OrvosIdopontBearer — egy Laravel alapú REST API alkalmazás, amely orvosi pá
 - `id`: Elsődleges kulcs  
 - `name`: Felhasználó teljes neve  
 - `email`: E-mail cím (egyedi)  
-- `email_verified_at`: E-mail ellenőrzés időbélyege *(nullable)*  
-- `password`: Hash-elt jelszó  
+- `password`: Hash-elt jelszó
+- `role`: Felhasználó jogosultsága (user/admin)
 - `remember_token`: Session / remember token *(nullable)*  
-- `created_at`, `updated_at`: Időbélyegek
+- `created_at`, `updated_at`, `deleted_at`: Időbélyegek
 
 ---
 
@@ -36,7 +36,7 @@ OrvosIdopontBearer — egy Laravel alapú REST API alkalmazás, amely orvosi pá
 - `name`: Páciens neve
 - `email`: Páciens email címe
 - `birth_date`: Születési dátum *(nullable)*  
-- `created_at`, `updated_at`: Időbélyegek  
+- `created_at`, `updated_at`, `deleted_at`: Időbélyegek  
 
 ---
 
@@ -45,16 +45,17 @@ OrvosIdopontBearer — egy Laravel alapú REST API alkalmazás, amely orvosi pá
 - `name`: Orvos neve  
 - `specialization`: Szakvizsga / specializáció *(nullable)*
 - `room`: Szoba megnevezése
-- `created_at`, `updated_at`: Időbélyegek  
+- `created_at`, `updated_at`, `deleted_at`: Időbélyegek  
 
 ---
 
 ### Appointment (Időpont)
 - `id`: Elsődleges kulcs  
 - `patient_id`: Foglaláshoz tartozó páciens *(FK)*  
-- `doctor_id`: Kapcsolódó orvos *(FK)*  
-- `status`: Státusz (pl. `pending`, `confirmed`, `completed`, `cancelled`)  
-- `created_at`, `updated_at`: Időbélyegek  
+- `doctor_id`: Kapcsolódó orvos *(FK)*
+- `appointment_time`: Időpont
+- `status`: Státusz (pl. `pending`, `approved`, `cancelled`)  
+- `created_at`, `updated_at`, `deleted_at`: Időbélyegek  
 
 
 ### Adatbázis struktúra
@@ -96,7 +97,6 @@ Minden modellnél és migrációnál soft delete alkalmazva, csak kitöröltnek 
 
 Példa:
 
-
 ```
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -106,6 +106,9 @@ class Patient extends Model
 }
 
 ```
+
+<img width="1024" height="256" alt="image" src="https://github.com/user-attachments/assets/c5cc2894-47f3-47b4-ab31-6edc6f0be9e9" />
+
 
 
 ## Nem védett végpontok
