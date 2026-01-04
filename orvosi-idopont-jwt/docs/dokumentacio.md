@@ -120,7 +120,7 @@ class Patient extends Model
 
 - GET `/hello` — teszt: visszaad egy JSON üzenetet
 - POST `/register` — felhasználó regisztráció
-- POST `/login` — bejelentkezés, visszaadja a Bearer tokent
+- POST `/login` — bejelentkezés, visszaadja a JWT tokent
 
 ```
 
@@ -165,7 +165,36 @@ Fejlécek:
 - admin: minden erőforrást lát/kezel
 - user: csak a saját rekordjaihoz fér hozzá (patients/appointments), nem hozhat létre orvost/egyéb admin műveleteket
 
-<img width="656" height="467" alt="image" src="https://github.com/user-attachments/assets/7f388b5a-17d0-4b65-a371-acd8df1abb71" />
+```
+
+// 🔐 JWT PROTECTED
+Route::middleware('auth:api')->group(function () {
+
+    Route::post('/logout', [AuthController::class, 'logout']);
+
+    // 👤 PATIENTS
+    Route::get('/patients', [PatientController::class, 'index']);
+    Route::get('/patients/{id}', [PatientController::class, 'show']);
+    Route::post('/patients', [PatientController::class, 'store']);
+    Route::put('/patients/{id}', [PatientController::class, 'update']);
+    Route::delete('/patients/{id}', [PatientController::class, 'destroy']);
+
+    // 👨‍⚕️ DOCTORS
+    Route::get('/doctors', [DoctorController::class, 'index']);
+    Route::get('/doctors/{id}', [DoctorController::class, 'show']);
+    Route::post('/doctors', [DoctorController::class, 'store']);
+    Route::put('/doctors/{id}', [DoctorController::class, 'update']);
+    Route::delete('/doctors/{id}', [DoctorController::class, 'destroy']);
+
+    // 📅 APPOINTMENTS
+    Route::get('/appointments', [AppointmentController::class, 'index']);
+    Route::post('/appointments', [AppointmentController::class, 'store']);
+    Route::patch('/appointments/{appointment}', [AppointmentController::class, 'update']);
+    Route::delete('/appointments/{appointment}', [AppointmentController::class, 'destroy']);
+
+    Route::middleware('auth:api')->post('/logout', [AuthController::class, 'logout']);
+
+```
 
 ---
 
@@ -174,13 +203,33 @@ Fejlécek:
 <img width="271" height="142" alt="image" src="https://github.com/user-attachments/assets/32f1ea7a-bb1c-430d-8880-ab186eded42a" />
 
 
-GET `/patients` — lista
+GET `/patients` — lista:
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
 - admin: mindenkit lát
-- user: csak saját record (feltételezve user.id = patient.id)
+- user: csak saját rekordjait (feltételezve user.id = patient.id)
 
-GET `/patients/{id}` — részletek a páciensről (403, ha nincs jogosultság)
+GET `/patients/{id}`:
 
-POST `/patients` — létrehozás (csak admin tud létrehozni)
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Részletek a páciensről (403, ha nincs jogosultság)
+
+POST `/patients`:
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Létrehozás (csak admin tud létrehozni)
 
 Body (példa):
 ```
@@ -202,7 +251,15 @@ Válasz: 201 Created + patient objektum
 }
 ```
 
-PUT `/patients/{id}` — teljes frissítés (csak admin)
+PUT `/patients/{id}`:
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Teljes frissítés (csak admin)
+
 ```
 {
   "name": "Norbert Kovács Updated",
@@ -210,7 +267,14 @@ PUT `/patients/{id}` — teljes frissítés (csak admin)
 }
 ```
 
-DELETE `/patients/{id}` — törlés (csak admin)
+DELETE `/patients/{id}`
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Törlés (csak admin)
 
 ---
 
@@ -220,10 +284,33 @@ DELETE `/patients/{id}` — törlés (csak admin)
 
 
 
-GET `/doctors` — lista (minden user láthatja)
-GET `/doctors/{id}` — részletek
+GET `/doctors`:
 
-POST `/doctors` — létrehozás (csak admin)
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Orvosok listája (minden user láthatja).
+
+GET `/doctors/{id}`:
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Részletek az adott orvosról.
+
+POST `/doctors`
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Létrehozás (csak admin).
+
 Body:
 ```
 {
@@ -233,9 +320,23 @@ Body:
 }
 ```
 
-PUT `/doctors/{id}` — módosítás (csak admin)
+PUT `/doctors/{id}`:
 
-DELETE `/doctors/{id}` — törlés (csak admin)
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Módosítás (csak admin)
+
+DELETE `/doctors/{id}`:
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Törlés (csak admin)
 
 ---
 
@@ -245,16 +346,36 @@ DELETE `/doctors/{id}` — törlés (csak admin)
 
 
 
-GET `/appointments` — lista
+GET `/appointments`:
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Információ:
 - admin: minden időpont
 - user: csak sajátjai (appointment.patient_id === user.id)
-Lehetőség szűrésre query paramokkal:
-- ?doctor_id=#
-- ?status=scheduled|completed|cancelled
 
-GET `/appointments/{id}` — részletek (403, ha nem jogosult)
+GET `/appointments/{id}: 
 
-POST `/appointments` — létrehozás (jelen implementáció: csak admin hozhat létre)
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Részletek az időpontokról(403, ha nem jogosult)
+
+POST `/appointments`:
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+
+Létrehozás (jelen implementáció: csak admin hozhat létre)
+
 Body:
 ```
 {
@@ -266,10 +387,25 @@ Body:
 ```
 Válasz: 201 Created + appointment objektum
 
-PUT `/appointments/{id}` — teljes frissítés (admin vagy a saját patient-je)
+PUT `/appointments/{id}`:
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
 
 
-DELETE `/appointments/{id}` — törlés (admin vagy a saját patient-je)
+Teljes frissítés (admin vagy a saját patient-je)
+
+
+DELETE `/appointments/{id}`:
+
+Fejlécek:
+- Authorization: Bearer {token}
+- Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
+
+Törlés (admin vagy a saját patient-je)
 
 ---
 
