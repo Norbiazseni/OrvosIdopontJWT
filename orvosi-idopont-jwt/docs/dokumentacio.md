@@ -122,14 +122,24 @@ class Patient extends Model
 - POST `/register` — felhasználó regisztráció
 - POST `/login` — bejelentkezés, visszaadja a Bearer tokent
 
-<img width="564" height="281" alt="image" src="https://github.com/user-attachments/assets/6fc19004-4f96-4831-bf96-7c4020a6fca1" />
+```
 
-Fejléc:
-- Content-Type: application/json
-- Accept: application/json
+// 🔓 PUBLIC
+Route::get('/hello', function () {
+    return response()->json(['message' => 'Hello API']);
+});
+
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/login', [AuthController::class, 'login']);
+
+```
+
 
 Példa /login kérésre:
 
+Fejlécek:
+- Content-Type: application/json
+- Accept: application/json
 
 ```
 Body:
@@ -146,9 +156,10 @@ Példa válasz:
 
 ## Védett végpontok (auth:sanctum)
 
-Fejléc:
+Fejlécek:
 - Authorization: Bearer {token}
 - Accept: application/json
+- Authorization: Bearer {JWT_TOKEN}
 
 Általános jogosultságok:
 - admin: minden erőforrást lát/kezel
