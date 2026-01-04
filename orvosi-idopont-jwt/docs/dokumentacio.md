@@ -102,7 +102,7 @@ Minden modellnél és migrációnál soft delete alkalmazva, csak kitöröltnek 
 
 Példa:
 
-```
+```php
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Patient extends Model
@@ -122,7 +122,7 @@ class Patient extends Model
 - POST `/register` — felhasználó regisztráció
 - POST `/login` — bejelentkezés, visszaadja a JWT tokent
 
-```
+```php
 
 // 🔓 PUBLIC
 Route::get('/hello', function () {
@@ -419,8 +419,8 @@ Response: 401 Unauthorized
 
 ### Hitelesítés és Jogosultságok 
 
-### Token-alapú Autentifikáció
-- Minden hitelesített végpont `Authorization: Bearer {token}` header-t igényel
+### JWT Token-alapú Autentifikáció
+- Minden hitelesített végpont `Authorization: Bearer {JWT token}` header-t igényel
 - A token bejelentkezéskor jön vissza
 - A tokeneket a `personal_access_tokens` táblában tároljuk
 
@@ -445,13 +445,14 @@ Response: 401 Unauthorized
 
 - Factories és seederek használata: database/seeders/DatabaseSeeder.php és factories mappában.
 - Futtatás helyben: php artisan migrate:fresh --seed majd php artisan test
-- Tesztek API hívásokat imitálnak: actingAs($user) vagy tokennel withHeaders(['Authorization' => 'Bearer '.$token])
+- A feature tesztek API hívásokat imitálnak.
+-JWT alapú autentikáció esetén a tesztek többsége Bearer tokennel történik:
 
 ### Factory-k:
 
 **-AppointmentFactory.php**
 
-```
+```php
 <?php
 
 namespace Database\Factories;
@@ -468,20 +469,21 @@ class AppointmentFactory extends Factory
     public function definition()
     {
         return [
-            'patient_id' => Patient::factory(),   // új Patient rekordot ad hozzá
-            'doctor_id' => Doctor::factory(),     // új Doctor rekordot ad hozzá
+            'patient_id' => Patient::factory(),
+            'doctor_id' => Doctor::factory(),
             'appointment_time' => $this->faker->dateTimeBetween('+1 days', '+1 month'),
-            'status' => $this->faker->randomElement(['scheduled','completed','cancelled']),
+            'status' => $this->faker->randomElement(['pending', 'approved', 'cancelled']),
         ];
     }
-
 }
+?>
+
 ```
-Az AppointmentFactory automatikusan létrehoz időpontokat a teszteléshez vagy seedeléshez. Minden új rekordhoz új pácienst és orvost generál, valamint véletlenszerű időpontot és státuszt rendel (scheduled, completed, cancelled).
+Az AppointmentFactory automatikusan hoz létre teszteléshez időpontfoglalásokat, minden rekordhoz új pácienst és orvost generálva, valamint véletlenszerű jövőbeli időpontot és státuszt (pending, approved, cancelled) rendel hozzá.
 
 **-DoctorFactory.php**
 
-```
+```php
 <?php
 
 namespace Database\Factories;
@@ -497,8 +499,8 @@ class DoctorFactory extends Factory
     {
         return [
             'name' => $this->faker->name(),
-            'specialization' => $this->faker->word(),
-            'room' => $this->faker->numberBetween(100, 500),
+            'specialization' => $this->faker->randomElement(['Cardiology', 'Dermatology', 'Pediatrics']),
+            'room' => $this->faker->numberBetween(101, 305),
         ];
     }
 }
@@ -509,13 +511,12 @@ A DoctorFactory automatikusan létrehoz orvosokat teszteléshez vagy seedeléshe
 
 **-PatientFactory.php**
 
-```
+```php
 <?php
 
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 use App\Models\Patient;
 
 class PatientFactory extends Factory
@@ -525,116 +526,150 @@ class PatientFactory extends Factory
     public function definition()
     {
         return [
-            'name' => $this->faker->name,
-            'email' => $this->faker->unique()->safeEmail,
-            'birth_date' => $this->faker->date(),
+            'name' => $this->faker->name(),
+            'email' => $this->faker->unique()->safeEmail(),
+            'birth_date' => $this->faker->date(), // véletlenszerű születési dátum
         ];
     }
 }
-
 ?>
 ```
 A PatientFactory automatikusan létrehoz pácienseket teszteléshez vagy seedeléshez, véletlenszerű nevet, egyedi e-mail címet és születési dátumot generálva minden új rekordhoz.
 
 **-UserFactory.php**
 
-```
+```php
 <?php
 
 namespace Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use App\Models\User;
 
+/**
+ * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
+ */
 class UserFactory extends Factory
 {
-    protected $model = User::class;
+    /**
+     * The current password being used by the factory.
+     */
+    protected static ?string $password;
 
-    public function definition()
+    /**
+     * Define the model's default state.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
     {
         return [
-            'name' => $this->faker->name(),
-            'email' => $this->faker->unique()->safeEmail,
+            'name' => fake()->name(),
+            'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'password' => bcrypt('password'), // jelszó minden usernek: password
+            'password' => bcrypt('password'), // egyszerűség kedvéért
+            'role' => 'user',
             'remember_token' => Str::random(10),
-            'role' => 'user', // alap user, admin a seederben külön
         ];
     }
 
-    // Admin állapot
-    public function admin()
+    public function admin(): static
     {
-        return $this->state(fn () => ['role' => 'admin']);
+        return $this->state(fn () => [
+            'role' => 'admin',
+            'email' => 'admin@email.hu'
+        ]);
+    }
+
+    /**
+     * Indicate that the model's email address should be unverified.
+     */
+    public function unverified(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'email_verified_at' => null,
+        ]);
     }
 }
 
+
 ```
-A UserFactory automatikusan létrehoz felhasználókat teszteléshez vagy seedeléshez. Minden usernek ad egy nevet, egyedi e-mail címet, alap jelszót (password), valamint egy role mezőt (user), és tartalmaz egy admin helper-t is, amivel könnyen készíthetünk admin jogosultságú felhasználót a seederben.
+A UserFactory automatikusan hoz létre felhasználókat teszteléshez vagy seedeléshez alapértelmezetten user szerepkörrel, egységes jelszóval (password), valamint tartalmaz egy admin() állapotot admin jogosultságú felhasználók létrehozásához.
 
 
 ## Controllerek
 
 **-AuthController.php**
 
-```
+```php
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use App\Models\User;
+use Illuminate\Support\Facades\Hash;
+use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthController extends Controller
 {
-    // REGISTER
+    // 🟢 REGISZTRÁCIÓ
     public function register(Request $request)
     {
         $request->validate([
-            'name' => 'required',
-            'email' => 'required|email|unique:users',
-            'password' => 'required'
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6|confirmed'
         ]);
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => Hash::make($request->password)
+            'password' => Hash::make($request->password),
+            'role' => 'user'
         ]);
 
-        return response()->json(['user' => $user], 201);
+        $token = JWTAuth::fromUser($user);
+
+        return response()->json([
+            'message' => 'Registered successfully',
+            'token' => $token,
+            'user' => $user
+        ], 201);
     }
 
-    // LOGIN
+    // 🔵 LOGIN
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => 'required',
+        $credentials = $request->validate([
+            'email' => 'required|email',
             'password' => 'required'
         ]);
 
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json(['error' => 'Invalid credentials'], 401);
+        if (!$token = JWTAuth::attempt($credentials)) {
+            return response()->json(['message' => 'Invalid credentials'], 401);
         }
 
-        // Token generálás
-        $token = $user->createToken('api-token')->plainTextToken;
-
-        return response()->json(['token' => $token]);
+        return response()->json([
+            'token' => $token,
+            'user' => JWTAuth::user()
+        ]);
     }
 
-    // LOGOUT
-    public function logout(Request $request)
+
+    public function logout()
     {
-        $request->user()->tokens()->delete();
+        JWTAuth::invalidate(JWTAuth::getToken());
 
-        return response()->json(['message' => 'Logged out']);
+        return response()->json([
+            'message' => 'Successfully logged out'
+        ]);
     }
+
 }
+?>
 
 ```
 
@@ -642,7 +677,7 @@ Az AuthController kezeli a felhasználók regisztrációját, bejelentkezését 
 
 **-DoctorController.php**
 
-```
+```php
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -650,86 +685,81 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Doctor;
+use Illuminate\Support\Facades\Auth;
 
 class DoctorController extends Controller
 {
-    // Listázás
-    public function index(Request $request)
+    public function index()
     {
-        $user = $request->user();
-        $query = Doctor::query();
-
-        // USER-ek ne módosíthassák, de láthatják az összes orvost
-        // Ha akarjuk, csak admin láthat mindent, usernek csak listázás
-        return response()->json($query->get());
+        return Doctor::all();
     }
 
-    // Egy orvos lekérése
     public function show($id)
     {
-        $doctor = Doctor::findOrFail($id);
-        return response()->json($doctor);
+        return Doctor::findOrFail($id);
     }
 
-    // Új orvos létrehozása (csak admin)
     public function store(Request $request)
     {
-        $user = $request->user();
-        if ($user->role !== 'admin') {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
+        $this->adminOnly();
 
         $data = $request->validate([
-            'name' => 'required|string',
-            'specialization' => 'required|string',
-            'room' => 'required|string',
+            'name' => 'required|string|max:255',
+            'specialization' => 'required|string|max:255',
+            'room' => 'required|string|max:50',
         ]);
 
         $doctor = Doctor::create($data);
+
         return response()->json($doctor, 201);
     }
 
-    // Orvos adatainak módosítása (csak admin)
     public function update(Request $request, $id)
     {
-        $user = $request->user();
-        if ($user->role !== 'admin') {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
+        $this->adminOnly();
 
         $doctor = Doctor::findOrFail($id);
 
         $data = $request->validate([
-            'name' => 'sometimes|string',
-            'specialization' => 'sometimes|string',
-            'room' => 'sometimes|string',
+            'name' => 'sometimes|string|max:255',
+            'specialization' => 'sometimes|string|max:255',
+            'room' => 'sometimes|string|max:50',
         ]);
 
         $doctor->update($data);
+
         return response()->json($doctor);
     }
 
-    // Orvos törlése (csak admin)
-    public function destroy(Request $request, $id)
+    public function destroy($id)
     {
-        $user = $request->user();
-        if ($user->role !== 'admin') {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
+        $this->adminOnly();
 
         $doctor = Doctor::findOrFail($id);
         $doctor->delete();
 
-        return response()->json(['message' => 'Deleted']);
+        return response()->json([
+            'message' => 'Doctor deleted successfully'
+        ]);
+    }
+
+    private function adminOnly(): void
+    {
+        $user = Auth::user();
+
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Admin only');
+        }
     }
 }
+?>
 
 ```
 A DoctorController kezeli az orvosok adatait az API-n keresztül. Bárki lekérdezheti az orvosok listáját vagy egy konkrét orvos adatait, de új orvos létrehozása, módosítása vagy törlése csak admin jogosultsággal lehetséges
 
 **-PatientController.php**
 
-```
+```php
 
 <?php
 
@@ -738,91 +768,129 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Patient;
+use Illuminate\Support\Facades\Auth;
 
 class PatientController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * ADMIN: minden páciens
+     * USER: csak a saját páciens rekordja
+     */
+    public function index()
     {
-        $user = $request->user();
+        $user = Auth::user();
 
-        $query = Patient::query();
-
-        if ($user->role !== 'admin') {
-            // User csak a saját recordját látja, feltételezzük user_id = patient_id
-            $query->where('id', $user->id);
+        if ($user->role === 'admin') {
+            return Patient::all();
         }
 
-        return response()->json($query->get());
+        return Patient::where('user_id', $user->id)->get();
     }
 
-    public function show(Request $request, $id)
-    {
-        $user = $request->user();
-        $patient = Patient::findOrFail($id);
-
-        if ($user->role !== 'admin' && $patient->id !== $user->id) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        return response()->json($patient);
-    }
-
+    /**
+     * ADMIN: bárkit létrehozhat
+     * USER: csak saját magának
+     */
     public function store(Request $request)
     {
-        $user = $request->user();
-        if ($user->role !== 'admin') {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
+        $user = Auth::user();
 
         $data = $request->validate([
-            'name' => 'required|string',
-            'email' => 'required|email|unique:patients',
-            'birth_date' => 'required|date'
+            'name' => 'required|string|max:255',
+            'birth_date' => 'required|date',
+            'phone' => 'required|string|max:20',
+            'user_id' => 'sometimes|exists:users,id'
         ]);
 
-        $patient = Patient::create($data);
-        return response()->json($patient, 201);
+        // user nem adhat meg más user_id-t
+        if ($user->role !== 'admin') {
+            $data['user_id'] = $user->id;
+        }
+
+        return response()->json(
+            Patient::create($data),
+            201
+        );
     }
 
-    public function update(Request $request, $id)
+    /**
+     * ADMIN: bárkit
+     * USER: csak a sajátját
+     */
+    public function show($id)
     {
-        $user = $request->user();
         $patient = Patient::findOrFail($id);
 
-        if ($user->role !== 'admin') {
-            return response()->json(['error' => 'Unauthorized'], 403);
+        $user = Auth::user();
+        if ($user->role !== 'admin' && $patient->user_id !== $user->id) {
+            abort(403, 'Forbidden');
+        }
+
+        return $patient;
+    }
+
+    /**
+     * ADMIN: bárkit
+     * USER: csak a sajátját
+     */
+    public function update(Request $request, $id)
+    {
+        $patient = Patient::findOrFail($id);
+
+        $user = Auth::user();
+        if ($user->role !== 'admin' && $patient->user_id !== $user->id) {
+            abort(403, 'Forbidden');
         }
 
         $data = $request->validate([
-            'name' => 'sometimes|string',
-            'email' => 'sometimes|email|unique:patients,email,'.$id,
-            'birth_date' => 'sometimes|date'
+            'name' => 'sometimes|string|max:255',
+            'birth_date' => 'sometimes|date',
+            'phone' => 'sometimes|string|max:20'
         ]);
 
         $patient->update($data);
+
         return response()->json($patient);
     }
 
-    public function destroy(Request $request, $id)
+    /**
+     * ADMIN: törölhet
+     * USER: NEM
+     */
+    public function destroy($id)
     {
-        $user = $request->user();
-        if ($user->role !== 'admin') {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
+        $this->adminOnly();
 
-        $patient = Patient::findOrFail($id);
-        $patient->delete();
-        return response()->json(['message' => 'Deleted']);
+        Patient::findOrFail($id)->delete();
+
+        return response()->json([
+            'message' => 'Patient deleted successfully'
+        ]);
+    }
+
+    /**
+     * ====== SEGÉD METÓDUSOK ======
+     */
+
+    private function adminOnly(): void
+    {
+        $user = Auth::user();
+
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Admin only');
+        }
     }
 }
 
+
 ```
 
-A PatientController kezeli a páciens adatait az API-n keresztül. Admin felhasználók teljes hozzáféréssel létrehozhatnak, módosíthatnak és törölhetnek pácienseket, míg normál felhasználók csak a saját adataikat láthatják és kérhetik le, a jogosultságokat minden műveletnél ellenőrzi.
+A PatientController kezeli a páciensek adatait; az admin minden rekordhoz hozzáfér, míg a normál felhasználók kizárólag a saját felhasználói fiókjukhoz (user_id) tartozó páciens rekordot érhetik el és módosíthatják.
 
 **-AppointmentController.php**
 
-```
+```php
+
 <?php
 
 namespace App\Http\Controllers\Api;
@@ -830,117 +898,136 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Appointment;
+use App\Models\Patient;
+use Illuminate\Support\Facades\Auth;
 
 class AppointmentController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $user = $request->user();
-        $query = Appointment::query();
+        $user = Auth::user();
 
-        if ($user->role !== 'admin') {
-            $query->where('patient_id', $user->id);
+        // Admin sees all appointments
+        if ($user->role === 'admin') {
+            return Appointment::with(['patient', 'doctor'])->get();
         }
 
-        if ($request->has('doctor_id')) {
-            $query->where('doctor_id', $request->doctor_id);
-        }
-
-        if ($request->has('status')) {
-            $query->where('status', $request->status);
-        }
-
-        return response()->json($query->get());
-    }
-
-    public function show(Request $request, $id)
-    {
-        $user = $request->user();
-        $appointment = Appointment::findOrFail($id);
-
-        if ($user->role !== 'admin' && $appointment->patient_id !== $user->id) {
-            return response()->json(['error' => 'Unauthorized'], 403);
-        }
-
-        return response()->json($appointment);
+        // Regular user sees only their appointments (via their patient record)
+        $patientIds = Patient::where('user_id', $user->id)->pluck('id');
+        
+        return Appointment::whereIn('patient_id', $patientIds)
+            ->with(['patient', 'doctor'])
+            ->get();
     }
 
     public function store(Request $request)
     {
+        $user = Auth::user();
+
         $request->validate([
-            'patient_id' => 'required|exists:patients,id',
-            'doctor_id' => 'required|exists:doctors,id',
+            'patient_id'       => 'required|exists:patients,id',
+            'doctor_id'        => 'required|exists:doctors,id',
             'appointment_time' => 'required|date',
-            'status' => 'required|string',
         ]);
 
-        // Csak admin hozhat létre időpontot
-        if(auth()->user()->role !== 'admin') {
-            return response()->json(['message' => 'Forbidden'], 403);
+        // Check if user owns this patient record
+        $patient = Patient::findOrFail($request->patient_id);
+        
+        if ($user->role !== 'admin' && $patient->user_id !== $user->id) {
+            return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $appointment = Appointment::create($request->all());
+        $appointment = Appointment::create([
+            'patient_id'       => $request->patient_id,
+            'doctor_id'        => $request->doctor_id,
+            'appointment_time' => $request->appointment_time,
+            'status'           => 'pending',
+        ]);
 
         return response()->json($appointment, 201);
     }
 
     public function update(Request $request, $id)
     {
-        $user = $request->user();
+        $user = Auth::user();
         $appointment = Appointment::findOrFail($id);
 
-        if ($user->role !== 'admin' && $appointment->patient_id !== $user->id) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+        // Admin can update any appointment
+        // Users can only update their own appointments
+        if ($user->role !== 'admin') {
+            $patient = $appointment->patient;
+            if (!$patient || $patient->user_id !== $user->id) {
+                return response()->json(['error' => 'Forbidden'], 403);
+            }
         }
 
         $data = $request->validate([
-            'doctor_id' => 'sometimes|integer',
+            'doctor_id'        => 'sometimes|exists:doctors,id',
             'appointment_time' => 'sometimes|date',
-            'status' => 'sometimes|string'
+            'status'           => 'sometimes|in:pending,approved,cancelled',
         ]);
 
+        // Only admin can change status
+        if (isset($data['status']) && $user->role !== 'admin') {
+            return response()->json(['error' => 'Only admin can change appointment status'], 403);
+        }
+
         $appointment->update($data);
+
         return response()->json($appointment);
     }
 
-    public function destroy(Request $request, $id)
+    public function destroy($id)
     {
-        $user = $request->user();
+        $user = Auth::user();
         $appointment = Appointment::findOrFail($id);
 
-        if ($user->role !== 'admin' && $appointment->patient_id !== $user->id) {
-            return response()->json(['error' => 'Unauthorized'], 403);
+        // Admin can delete any appointment
+        // Users can only delete their own appointments
+        if ($user->role !== 'admin') {
+            $patient = $appointment->patient;
+            if (!$patient || $patient->user_id !== $user->id) {
+                return response()->json(['error' => 'Forbidden'], 403);
+            }
         }
 
         $appointment->delete();
+
         return response()->json(['message' => 'Deleted']);
     }
 }
 
 
+
+
 ```
 
-Az AppointmentController kezeli az időpontok API-n keresztüli CRUD műveleteit.
+Az AppointmentController kezeli az időpontok CRUD műveleteit; az admin minden időpontot kezelhet, míg a normál felhasználók kizárólag a saját pácienseikhez tartozó időpontokat láthatják, hozhatják létre, módosíthatják vagy törölhetik, a státusz módosítása pedig kizárólag admin jogosultsággal lehetséges.
 
 ## Modellek
 
 **-Appointment.php**
 
-```
+```php
 <?php
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Testing\Fluent\Concerns\Has;
 
 class Appointment extends Model
 {
-    use HasFactory; // <-- EZ FONTOS
-    use SoftDeletes;
+    use SoftDeletes, HasFactory;
 
-    protected $fillable = ['patient_id', 'doctor_id', 'appointment_time', 'status'];
+    protected $fillable = [
+        'patient_id',
+        'doctor_id',
+        'appointment_time',
+        'status'
+    ];
 
     public function patient()
     {
@@ -952,6 +1039,7 @@ class Appointment extends Model
         return $this->belongsTo(Doctor::class);
     }
 }
+?>
 
 ```
 Az Appointment (Időpont) modell az időpontfoglalásokat reprezentálja az alkalmazásban.
@@ -959,7 +1047,7 @@ Támogatja a factory-ket (teszteléshez/seedeléshez), a soft delete-et (törlé
 
 **-Doctor.php**
 
-```
+```php
 <?php
 
 namespace App\Models;
@@ -970,11 +1058,21 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Doctor extends Model
 {
-    use HasFactory; // FONTOS
-    use SoftDeletes;
+    use SoftDeletes, HasFactory;
 
-    protected $fillable = ['name', 'specialization', 'room'];
+    protected $fillable = [
+        'name',
+        'specialization',
+        'room',
+    ];
+
+    public function appointments()
+    {
+        return $this->hasMany(Appointment::class);
+    }
 }
+
+?>
 
 ```
 
@@ -983,22 +1081,30 @@ Támogatja a factory-ket (teszteléshez/seedeléshez), a soft delete-et (logikai
 
 **-Patient.php**
 
-```
+```php
 
 <?php
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Patient extends Model
 {
-    use HasFactory; // EZ FONTOS
-    use SoftDeletes;
+    use SoftDeletes, HasFactory;
 
-    protected $fillable = ['name', 'email', 'birth_date'];
+    protected $fillable = [
+        'name',
+        'email',
+        'birth_date'
+    ];
+
+    public function appointments()
+    {
+        return $this->hasMany(Appointment::class);
+    }
 }
 
 ?>
@@ -1010,111 +1116,112 @@ Támogatja a factory-ket (tesztelés/seedelés), a soft delete-et (logikai törl
 
 **-User.php**
 
-```
+```php
 
 <?php
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
+use Tymon\JWTAuth\Contracts\JWTSubject;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-
-class User extends Authenticatable
+class User extends Authenticatable implements JWTSubject
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable, HasApiTokens, SoftDeletes;;
+    use HasFactory, Notifiable, SoftDeletes;
 
-    /**
-     * The attributes that are mass assignable.
-     *
-     * @var list<string>
-     */
     protected $fillable = [
         'name',
         'email',
         'password',
+        'role'
     ];
 
-    /**
-     * The attributes that should be hidden for serialization.
-     *
-     * @var list<string>
-     */
     protected $hidden = [
         'password',
-        'remember_token',
+        'remember_token'
     ];
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
+    public function getJWTIdentifier()
+    {
+        return $this->getKey();
+    }
+
+    public function getJWTCustomClaims()
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'role' => $this->role
         ];
+    }
+
+    // OPTIONAL kapcsolatok
+    public function doctor()
+    {
+        return $this->hasOne(Doctor::class);
+    }
+
+    public function patient()
+    {
+        return $this->hasOne(Patient::class);
     }
 }
 
+?>
+
 ```
 A User (Felhasználó) modell kezeli az alkalmazás felhasználóit és az autentikációt.
-Támogatja az API tokenes beléptetést (Sanctum), a factory-ket, az értesítéseket, valamint a soft delete-et; a jelszó rejtett és automatikusan hash-elve kerül mentésre.
+Támogatja a JWT alapú tokenes autentikációt (tymon/jwt-auth), a factory-ket, az értesítéseket, valamint a soft delete-et; a jelszó rejtett és automatikusan hash-elve kerül mentésre.
 
 ## Seedelés:
 
-Ez a **DatabaseSeeder** felelős az adatbázis feltöltéséért tesztelés vagy fejlesztés során. Létrehoz:
-
-1. Felhasználókat – 3 admin és 3 normál user.
-2. Pácienseket – 10 darab véletlenszerű rekord.
-3. Orvosokat – 5 darab véletlenszerű rekord.
-4. Időpontokat – 20 darab foglalás, ahol a patient_id és doctor_id már létező páciensekből és orvosokból kerül kiválasztásra, így valódi kapcsolatok jönnek létre az adatok között.
+A **DatabaseSeeder** az adatbázis feltöltéséért felel tesztelési és fejlesztési környezetben.
+Létrehoz egy admin felhasználót fix e-mail címmel, 10 darab normál felhasználót, egy páciens rekordot és egy orvos rekordot.
+Ezután 5 időpontot generál, amelyek mind ugyanahhoz a pácienshez és orvoshoz tartoznak, biztosítva az adatok közötti kapcsolatokat.
 
 
-```
+```php
 <?php
 
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\User;
+use App\Models\Appointment;
 use App\Models\Patient;
 use App\Models\Doctor;
-use App\Models\Appointment;
+
 
 class DatabaseSeeder extends Seeder
 {
-    public function run()
+    public function run(): void
     {
-        // 1️⃣ USERS
-        User::factory()->count(3)->admin()->create(); // 3 admin
-        User::factory()->count(3)->create();         // 3 normál user
+        // 🟢 Admin user
+        User::firstOrCreate(
+            ['email' => 'admin@email.hu'],
+            [
+                'name' => 'Admin User',
+                'password' => bcrypt('password'),
+                'role' => 'admin'
+            ]
+        );
 
-        // 2️⃣ PATIENTS
-        $patients = Patient::factory()->count(10)->create();
 
-        // 3️⃣ DOCTORS
-        $doctors = Doctor::factory()->count(5)->create();
+        // 🔵 Normál userek
+        User::factory(10)->create();
+        $patient = Patient::factory()->create();
+        $doctor = Doctor::factory()->create();
 
-        // 4️⃣ APPOINTMENTS
-        // Már létező patient/doctor rekordokból választ
-        Appointment::factory()->count(20)->create([
-            'patient_id' => function () use ($patients) {
-                return $patients->random()->id;
-            },
-            'doctor_id' => function () use ($doctors) {
-                return $doctors->random()->id;
-            }
+        // 🟣 Appointmentek
+        Appointment::factory()->count(5)->create([
+            'patient_id' => $patient->id,
+            'doctor_id' => $doctor->id
         ]);
+
     }
 }
+
 ```
 
 **Seedelés futtatása**: `php artisan db:seed`
