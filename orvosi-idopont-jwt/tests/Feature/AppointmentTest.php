@@ -39,7 +39,7 @@ class AppointmentTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $patient = Patient::factory()->create();
+        $patient = Patient::factory()->create(['user_id' => $user->id]);
         $doctor  = Doctor::factory()->create();
 
         Appointment::factory()->create([

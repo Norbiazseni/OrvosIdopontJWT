@@ -11,10 +11,16 @@ class Patient extends Model
     use SoftDeletes, HasFactory;
 
     protected $fillable = [
+        'user_id',
         'name',
         'email',
         'birth_date'
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function appointments()
     {

@@ -12,6 +12,7 @@ class PatientFactory extends Factory
     public function definition()
     {
         return [
+            'user_id' => \App\Models\User::factory(),
             'name' => $this->faker->name(),
             'email' => $this->faker->unique()->safeEmail(),
             'birth_date' => $this->faker->date(), // véletlenszerű születési dátum
