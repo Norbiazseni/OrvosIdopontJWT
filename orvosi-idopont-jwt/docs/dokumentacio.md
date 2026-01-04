@@ -112,7 +112,7 @@ class Patient extends Model
 
 ```
 
-<img width="1024" height="256" alt="image" src="https://github.com/user-attachments/assets/c5cc2894-47f3-47b4-ab31-6edc6f0be9e9" />
+<img width="1024" height="256" alt="531722403-c5cc2894-47f3-47b4-ab31-6edc6f0be9e9" src="https://github.com/user-attachments/assets/1d0ceae3-1bed-4d7f-a81b-793690bdf6ee" />
 
 
 
