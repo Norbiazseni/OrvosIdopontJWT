@@ -61,35 +61,40 @@ Az OrvosIdopontJWT egy Laravel-alapú REST API alkalmazás, amely orvosi pácien
 ### Adatbázis struktúra
 ```
 
-+-------------------------+      +----------------------+         +----------------------+        +-----------------------+
-| personal_access_tokens |       |        users         |         |       patients       |        |        doctors        |
-+-------------------------+    _1| id (PK)              |         | id (PK)              |        | id (PK)               |
-| id (PK)                 | K_/  | name                 |         | name                 |        | name                  |
-| tokenable_id (FK)       |      | email (unique)       |         | email (nullable)     |        | specialization        |
-| tokenable_type          |      | password             |         | phone (nullable)     |        | phone (nullable)      |
-| name                    |      | role ('admin/user')  |         | created_at           |        | created_at            |
-| token (unique)          |      | created_at           |         | updated_at           |        | updated_at            |
-| abilities               |      | updated_at           |         +----------------------+        +-----------------------+
-| last_used_at            |      +----------------------+
-| created_at              |
-+-------------------------+
-                                                                   1
-                                                   +-------------------------------------+
-                                                   |              appointments           |
-                                                   +-------------------------------------+
-                                                   | id (PK)                             |
-                                                   | patient_id (FK → patients.id)       |
-                                                   | doctor_id (FK → doctors.id)         |
-                                                   | appointment_time                    |
-                                                   | status ('pending','approved',...)   |
-                                                   | created_at                          |
-                                                   | updated_at                          |
-                                                   +-------------------------------------+
-                                                     ^                               ^
-                                                     |                               |
-                                                     |0..N                           |0..N
-                                                     |                               |
-                                                   patients                        doctors
++--------------------------+    +-----------------------+   +-----------------------+    +-----------------------+
+|   personal_access_tokens |    |         users         |   |        patients       |    |        doctors        |
++--------------------------+    +-----------------------+   +-----------------------+    +-----------------------+
+| id (PK)                  |    | id (PK)               |   | id (PK)               |    | id (PK)               |
+| tokenable_id (FK)        |    | name                  |   | name                  |    | name                  |
+| tokenable_type           |    | email (unique)        |   | email                 |    | specialization        |
+| name                     |    | password              |   | birth_date            |    | room                  |
+| token (unique)           |    | role                  |   | created_at            |    | created_at            |
+| abilities                |    | remember_token        |   | updated_at            |    | updated_at            |
+| last_used_at             |    | created_at            |   | deleted_at            |    | deleted_at            |
+| created_at               |    | updated_at            |   +-----------------------+    +-----------------------+
+| updated_at               |    | deleted_at            |
++--------------------------+   +-----------------------+
+                                  
+
+
+                         +-------------------------------------------+
+                         |               appointments                |
+                         +-------------------------------------------+
+                         | id (PK)                                   |
+                         | patient_id (FK → patients.id)             |
+                         | doctor_id (FK → doctors.id)               |
+                         | appointment_time                          |
+                         | status ('pending','approved','cancelled') |
+                         | created_at                                |
+                         | updated_at                                |
+                         | deleted_at                                |
+                         +-------------------------------------------+
+                                   ^                         ^
+                                   |                         |
+                                 1..N                      1..N
+                                   |                         |
+                              patients                    doctors
+
   
 ```
 
