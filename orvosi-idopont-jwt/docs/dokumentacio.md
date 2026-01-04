@@ -18,7 +18,7 @@ Az OrvosIdopontJWT egy Laravel-alapú REST API alkalmazás, amely orvosi pácien
 
 ---
 
-Érdemes tudnivalók a JWT Tokenről:
+## Érdemes tudnivalók a JWT Tokenről:
 
 -60 percig érvényes (3600 mp)
 -A token tartalmaz minden adatot
@@ -1237,7 +1237,7 @@ class DatabaseSeeder extends Seeder
 
 ## Tesztelés
 
--AppointmentTest.php
+### AppointmentTest.php
 
 Az AppointmentTest az időpontok lekérdezéséhez kapcsolódó jogosultságokat és viselkedést teszteli az API-n keresztül JWT-alapú autentikációval.
 
@@ -1319,7 +1319,7 @@ class AppointmentTest extends TestCase
 
 ```
 
--DoctorTest.php
+### DoctorTest.php
 
 
 A DoctorTest az orvosok kezeléséhez kapcsolódó API végpontok működését és jogosultságkezelését teszteli JWT-alapú autentikáció mellett.
@@ -1372,7 +1372,7 @@ class DoctorTest extends TestCase
 
 ```
 
--AuthTest.php
+### AuthTest.php
 
 Az AuthTest az API autentikációs folyamatait teszteli, különös tekintettel a felhasználói regisztrációra és a bejelentkezésre JWT-alapú hitelesítés mellett.
 
