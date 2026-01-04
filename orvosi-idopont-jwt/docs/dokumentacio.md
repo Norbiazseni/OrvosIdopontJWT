@@ -1438,7 +1438,7 @@ class AuthTest extends TestCase
 
 ```
 
--PatientTest.php
+### PatientTest.php
 
 A PatientTest az API pácienskezelő végpontjainak működését és jogosultságkezelését ellenőrzi JWT-alapú autentikáció mellett. A tesztek biztosítják, hogy az admin és a normál felhasználók csak a számukra engedélyezett műveleteket hajthassák végre.
 
@@ -1578,7 +1578,7 @@ class PatientTest extends TestCase
 ```
 
 
-12 tesztet tartalmaz, melyek közül mind sikerrel lefut.
+**12 tesztet tartalmaz, melyek közül mind sikerrel lefut.**
 
 <img width="486" height="184" alt="image" src="https://github.com/user-attachments/assets/f3a15f17-bbbe-4ba2-9596-171e6f89592b" />
 
