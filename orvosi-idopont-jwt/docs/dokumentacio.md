@@ -165,7 +165,7 @@ Fejlécek:
 - admin: minden erőforrást lát/kezel
 - user: csak a saját rekordjaihoz fér hozzá (patients/appointments), nem hozhat létre orvost/egyéb admin műveleteket
 
-```
+```php
 
 // 🔐 JWT PROTECTED
 Route::middleware('auth:api')->group(function () {
