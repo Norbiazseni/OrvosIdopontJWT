@@ -5,24 +5,24 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Doctor;
+use Illuminate\Support\Facades\Auth;
 
 class DoctorController extends Controller
 {
-    // 🔵 ÖSSZES DOKTOR
     public function index()
     {
         return Doctor::all();
     }
 
-    // 🔵 EGY DOKTOR
     public function show($id)
     {
         return Doctor::findOrFail($id);
     }
 
-    // 🟢 ÚJ DOKTOR
     public function store(Request $request)
     {
+        $this->adminOnly();
+
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'specialization' => 'required|string|max:255',
@@ -34,9 +34,10 @@ class DoctorController extends Controller
         return response()->json($doctor, 201);
     }
 
-    // ✏️ MÓDOSÍTÁS
     public function update(Request $request, $id)
     {
+        $this->adminOnly();
+
         $doctor = Doctor::findOrFail($id);
 
         $data = $request->validate([
@@ -50,15 +51,25 @@ class DoctorController extends Controller
         return response()->json($doctor);
     }
 
-    // 🗑 TÖRLÉS
     public function destroy($id)
     {
+        $this->adminOnly();
+
         $doctor = Doctor::findOrFail($id);
         $doctor->delete();
 
         return response()->json([
             'message' => 'Doctor deleted successfully'
         ]);
+    }
+
+    private function adminOnly(): void
+    {
+        $user = Auth::user();
+
+        if (!$user || $user->role !== 'admin') {
+            abort(403, 'Admin only');
+        }
     }
 }
 ?>
